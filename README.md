@@ -27,11 +27,11 @@ The dataset of MD17 will be automatically downloaded when running training.
 
 ### QM9
 
-1. We provide training scripts under [`scripts/train/qm9/equiformer`](scripts/train/qm9/equiformer).
+1. We provide training scripts under [`scripts/qm9`](scripts/qm9).
 For example, we can train Equiformer for the task of `alpha` by running:
 
     ```bash
-        sh scripts/train/qm9/equiformer/target@1.sh
+        sh scripts/qm9/target@1.sh
     ```
 
 2. The QM9 dataset will be downloaded automatically as we run training for the first time.
@@ -42,12 +42,12 @@ For example, we can train Equiformer for the task of `alpha` by running:
 
 ### MD17
 
-1. We provide training scripts under [`scripts/train/md17/equiformer`](scripts/train/md17/equiformer).
+1. We provide training scripts under [`scripts/md17`](scripts/md17).
 For example, we can train Equiformer for the molecule of `aspirin` by running:
 
     ```bash
-        sh scripts/train/md17/equiformer/se_l2/target@aspirin.sh    # L_max = 2
-        sh scripts/train/md17/equiformer/se_l3/target@aspirin.sh    # L_max = 3
+        sh scripts/md17/se_l2/target@aspirin.sh    # L_max = 2
+        sh scripts/md17/se_l3/target@aspirin.sh    # L_max = 3
     ```
 
 ### General 

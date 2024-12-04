@@ -1080,15 +1080,28 @@ class pos_prediction(torch.nn.Module):
             )
 
         self.fc_position = LinearRS(self.irreps_node_embedding, o3.Irreps('32x0e+32x1e+32x2e'), rescale=_RESCALE)
-
+        
         self.reshape_block = reshape(o3.Irreps('32x0e+32x1e+32x2e'))
         self.s2 = ToS2Grid_block(self.irreps_node_embedding.lmax, res)
 
+        # directional loss
         self.fc_logit = nn.Sequential(nn.Linear(32, 16),
             nn.SiLU(),
             nn.Linear(16, 1))
 
         self.KLDivLoss = KLDivloss()
+
+        # radius loss
+        self.num_gaussians = 128
+        self.fc_radius = nn.Sequential(nn.Linear(32, 64),
+            nn.SiLU(),
+            nn.Linear(64, self.num_gaussians))
+
+        self.gaussian_basis = torch.linspace(0, 6.0, self.num_gaussians)
+        pi = 3.14159
+        a = (2*pi) ** 0.5
+        self.std = 0.5
+        self.std_a = self.std * a
 
     def forward(self, pos, node_features, mask_node_features, mask_atom, mask_position, batch, target, edge_index_mask):
         node_features = torch.index_select(node_features, 0, edge_index_mask[0])
@@ -1100,6 +1113,7 @@ class pos_prediction(torch.nn.Module):
         position_logit = self.s2.ToGrid(position_out)
         position_logit = position_logit.reshape(position_logit.shape[0], position_logit.shape[1], -1)
 
+        # directional loss
         position_logit = position_logit.transpose(1, 2).contiguous()
         position_logit = self.fc_logit(position_logit)
         position_logit = position_logit.squeeze()
@@ -1111,14 +1125,23 @@ class pos_prediction(torch.nn.Module):
         neighbor_pos = pos[edge_index_mask[0]]
         label_pos = mask_position - neighbor_pos
         label_pos = label_pos.detach()
+        label_dist = label_pos.norm(dim=1, keepdim=True)
 
+        label_pos = label_pos / label_dist
         label_pos = o3.spherical_harmonics([0, 1, 2], label_pos, False)
         label_logit = self.s2.ToGrid(label_pos.unsqueeze(1))
         label_logit = label_logit.reshape(label_logit.shape[0], -1)
-        # label_logit = scatter(label_logit, edge_index_mask[0], dim=0, reduce="mean")
         label_logit = torch.softmax(label_logit / self.temperature_label, -1)
 
-        return self.KLDivLoss(res, label_logit)
+        # radius loss
+        radius_logit = position_out[:, :, 0]
+        radius_logit = torch.softmax(self.fc_radius(radius_logit), -1)
+
+        gaussian_basis = self.gaussian_basis.view(1, -1).to(device=label_dist.device)
+        label_dist = torch.exp(-0.5 * (((gaussian_basis - label_dist) / self.std) ** 2))
+        label_dist_logit = label_dist / label_dist.sum(1, keepdim=True)
+
+        return self.KLDivLoss(res, label_logit) + self.KLDivLoss(radius_logit, label_dist_logit)
 
 class reshape(nn.Module):
     def __init__(self, irreps):

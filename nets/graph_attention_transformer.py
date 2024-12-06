@@ -1135,7 +1135,7 @@ class pos_prediction(torch.nn.Module):
 
         # radius loss
         radius_logit = position_out[:, :, 0]
-        radius_logit = torch.softmax(self.fc_radius(radius_logit), -1)
+        radius_logit = F.log_softmax(self.fc_radius(radius_logit), -1)
 
         gaussian_basis = self.gaussian_basis.view(1, -1).to(device=label_dist.device)
         label_dist = torch.exp(-0.5 * (((gaussian_basis - label_dist) / self.std) ** 2))
